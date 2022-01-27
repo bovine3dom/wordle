@@ -52,4 +52,21 @@ max_tries = 1_000_000
         unlock(array_lock)
     end
 end
-sort!(answers, by=p->p[2], rev=true)
+
+function next_best_word(current_word; threshold=0)
+    answers = []
+    current = unique(current_word)|>join
+    @show current
+    max_score = 0
+    for w in five_char_words
+        if (length(join([w, current]) |> unique) + threshold < length(join([w,current])))
+            continue
+        end
+        this_score = score(join(w, current),inv=false)
+        if (this_score > max_score)
+            max_score = this_score
+            push!(answers, (w, this_score))
+        end
+    end
+    sort!(answers, by=x->x[2], rev=true)
+end
