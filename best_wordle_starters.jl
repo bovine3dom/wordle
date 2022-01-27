@@ -1,11 +1,12 @@
 #!/bin/julia
 import Unicode: normalize
 import Random: shuffle!, shuffle
+using ProgressMeter
 words = readlines("google-10000-english.txt")
 
 # For French we need to remove all accents, and shuffle because it's in alphabetical order
 # TODO: find french word list sorted by frequency
-# words = (readlines("fr.txt") .|> x -> normalize(x, stripmark=true, casefold=true)) |> shuffle!
+# words = (readlines("fr.txt") .|> x -> normalize(x, stripmark=true, casefold=true))
 
 freqs = Dict{Char,Float64}()
 for w in words
@@ -27,28 +28,28 @@ end
 # - three five letter words
 # - score per word = sum of unique frequency scores of each letter
 
-score(word) = sum(freqs[c] for c in word |> unique)
+score(word; inv=false) = sum(inv ? 1/freqs[c] : freqs[c] for c in word |> unique)
 
 # Get five letter words
 five_char_words = filter(w->length(w)==5, words)
 
 # Make pairs of three
+N = length(five_char_words)
 
-tuple_iterator = Iterators.product(five_char_words |> shuffle, five_char_words |> shuffle, five_char_words |> shuffle)
-
+array_lock = ReentrantLock()
 answers = []
 max_score = 0
 max_tries = 1_000_000
-tries = 0
-for word_tuple in tuple_iterator
+@time Threads.@threads for i in 1:max_tries
+    word_tuple = five_char_words[rand(1:N, 3)]
     this_score = score(word_tuple |> join)
     if (this_score > max_score)
+        lock(array_lock)
         push!(answers, (word_tuple, this_score))
-        max_score = this_score
-    end
-    tries += 1
-    if tries > max_tries
-        break
+        global max_score = this_score
+        # Showing answers while it works makes me feel better about progress
+        @show word_tuple
+        unlock(array_lock)
     end
 end
 sort!(answers, by=p->p[2], rev=true)
